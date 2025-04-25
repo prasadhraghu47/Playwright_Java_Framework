@@ -1,0 +1,283 @@
+// Project: Advanced Test Automation Framework
+// Language: Java (Maven-based project)
+
+// Directory Structure:
+// src/main/java/
+// ├── config/
+// │   ├── ConfigReader.java
+// │   └── YamlConfigReader.java
+// ├── utils/
+// │   ├── LoggerUtil.java
+// │   ├── JsonDataUtil.java
+// │   └── ScreenshotUtil.java
+// src/test/java/
+// ├── pageobjects/
+// │   └── LoginPage.java
+// ├── steps/
+// │   └── LoginSteps.java
+// ├── runners/
+// │   └── TestRunner.java
+// └── hooks/
+//     └── TestHooks.java
+
+// pom.xml (Dependencies - Playwright, Cucumber, Allure, Gson, Log4j, JUnit5, SnakeYAML)
+
+// pom.xml
+/*
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.framework</groupId>
+    <artifactId>advanced-framework</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.microsoft.playwright</groupId>
+            <artifactId>playwright</artifactId>
+            <version>1.42.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-java</artifactId>
+            <version>7.14.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-junit-platform-engine</artifactId>
+            <version>7.14.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-cucumber7-jvm</artifactId>
+            <version>2.21.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.10.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>2.20.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <version>2.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.0</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.1.2</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+*/
+
+// YamlConfigReader.java
+package config;
+
+import org.yaml.snakeyaml.Yaml;
+import java.io.InputStream;
+import java.util.Map;
+
+public class YamlConfigReader {
+    private static Map<String, Object> config;
+
+    static {
+        try (InputStream inputStream = YamlConfigReader.class.getClassLoader().getResourceAsStream("config.yaml")) {
+            if (inputStream == null) throw new RuntimeException("config.yaml not found");
+            Yaml yaml = new Yaml();
+            config = yaml.load(inputStream);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load YAML config", e);
+        }
+    }
+
+    public static String get(String key) {
+        return config.getOrDefault(key, "").toString();
+    }
+}
+
+// config.yaml
+baseUrl: "https://example.com"
+
+// ConfigReader.java
+package config;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
+
+public class ConfigReader {
+    private static final Properties properties = new Properties();
+
+    static {
+        try (FileInputStream fileInputStream = new FileInputStream("src/test/resources/config.properties")) {
+            properties.load(fileInputStream);
+        } catch (IOException e) {
+            throw new RuntimeException("Could not load config.properties", e);
+        }
+    }
+
+    public static String get(String key) {
+        return properties.getProperty(key);
+    }
+}
+
+// LoggerUtil.java
+package utils;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+public class LoggerUtil {
+    public static Logger getLogger(Class<?> clazz) {
+        return LogManager.getLogger(clazz);
+    }
+}
+
+// JsonDataUtil.java
+package utils;
+
+import com.google.gson.Gson;
+import java.io.FileReader;
+import java.util.Map;
+
+public class JsonDataUtil {
+    public static Map<String, Object> loadJson(String filePath) throws Exception {
+        try (FileReader reader = new FileReader(filePath)) {
+            Gson gson = new Gson();
+            return gson.fromJson(reader, Map.class);
+        }
+    }
+}
+
+// ScreenshotUtil.java
+package utils;
+
+import com.microsoft.playwright.Page;
+import java.nio.file.Paths;
+
+public class ScreenshotUtil {
+    public static void captureScreenshot(Page page, String fileName) {
+        page.screenshot(new Page.ScreenshotOptions().setPath(Paths.get("screenshots", fileName + ".png")));
+    }
+}
+
+// LoginPage.java
+package pageobjects;
+
+import com.microsoft.playwright.Page;
+
+public class LoginPage {
+    private final Page page;
+
+    public LoginPage(Page page) {
+        this.page = page;
+    }
+
+    public LoginPage enterUsername(String username) {
+        page.fill("#username", username);
+        return this;
+    }
+
+    public LoginPage enterPassword(String password) {
+        page.fill("#password", password);
+        return this;
+    }
+
+    public void clickLogin() {
+        page.click("#login");
+    }
+}
+
+// LoginSteps.java
+package steps;
+
+import com.microsoft.playwright.*;
+import io.cucumber.java.en.*;
+import pageobjects.LoginPage;
+
+public class LoginSteps {
+    private Browser browser;
+    private BrowserContext context;
+    private Page page;
+    private LoginPage loginPage;
+
+    @Given("user is on login page")
+    public void user_is_on_login_page() {
+        Playwright playwright = Playwright.create();
+        browser = playwright.chromium().launch();
+        context = browser.newContext();
+        page = context.newPage();
+        page.navigate("https://example.com/login");
+        loginPage = new LoginPage(page);
+    }
+
+    @When("user logs in with valid credentials")
+    public void login_with_valid_credentials() {
+        loginPage.enterUsername("admin").enterPassword("admin").clickLogin();
+    }
+
+    @Then("user should see the dashboard")
+    public void verify_dashboard() {
+        assert page.url().contains("dashboard");
+    }
+}
+
+// TestHooks.java
+package hooks;
+
+import com.microsoft.playwright.*;
+import io.cucumber.java.*;
+import utils.ScreenshotUtil;
+
+public class TestHooks {
+    private Playwright playwright;
+    private Browser browser;
+    private BrowserContext context;
+    private Page page;
+
+    @Before
+    public void setUp(Scenario scenario) {
+        playwright = Playwright.create();
+        browser = playwright.chromium().launch();
+        context = browser.newContext();
+        page = context.newPage();
+    }
+
+    @After
+    public void tearDown(Scenario scenario) {
+        if (scenario.isFailed() && page != null) {
+            ScreenshotUtil.captureScreenshot(page, scenario.getName().replaceAll(" ", "_"));
+        }
+        if (browser != null) browser.close();
+        if (playwright != null) playwright.close();
+    }
+}
+
+// TestRunner.java
+package runners;
+
+import org.junit.platform.suite.api.*;
+
+@Suite
+@IncludeEngines("cucumber")
+@SelectClasspathResource("features")
+@ConfigurationParameter(key = "cucumber.glue", value = "steps, hooks")
+public class TestRunner {
+}
